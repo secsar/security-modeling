@@ -2,6 +2,8 @@
 
 A state model defines valid security-relevant states and the operations that connect them.
 
+The [executable workflow lab](../labs/workflow.py) explores the model below with two fixed users and a finite version domain. Run `python3 -m labs workflow` or `python3 -m labs counterexample` from the repository root. See [bounds and results](../docs/validation.md).
+
 ## Illustrative approval workflow
 
 A record has state, author, approver, content_version, and approved_version.

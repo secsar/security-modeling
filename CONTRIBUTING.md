@@ -10,6 +10,8 @@ Use the [specification template](templates/security-model.md). Define the model 
 
 ## Review criteria
 
+For executable contributions, run `python3 -m unittest discover -s tests -v` and record the Python version and model bounds. Include permitted and denied cases, and a known defect that the checks detect where appropriate. Update the validation record only with observed results. Keep labs offline and dependency-free unless an additional tool materially improves the model.
+
 - Are policy, model, and enforcement mechanism distinguished?
 - Are subject and object attributes authoritative and well-defined?
 - Are default decisions, administrative actions, and revocation explicit?

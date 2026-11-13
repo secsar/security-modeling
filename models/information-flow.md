@@ -1,5 +1,7 @@
 # Information-flow models
 
+Run `python3 -m labs flow` to execute the [finite label model](../labs/flow.py) corresponding to the ordinary-flow relation below. Its algebraic checks do not establish noninterference of an application.
+
 Authorization answers whether an operation may occur. Information-flow modeling specifies where information may propagate, including through sequences of individually permitted operations.
 
 ## A small label model

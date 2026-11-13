@@ -1,5 +1,7 @@
 # Access-control models
 
+Try the [authorization lab](../labs/policy.py) with `python3 -m labs policy`. It illustrates role and tenant checks over one authoritative snapshot, not a complete authorization service.
+
 ## Core vocabulary
 
 Let S be subjects, O objects, and A actions. An access-control matrix M assigns a set of rights to each subject–object pair:

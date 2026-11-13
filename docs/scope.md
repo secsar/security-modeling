@@ -30,7 +30,7 @@ Threat catalogs, attack trees, attacker walkthroughs, likelihood/impact register
 
 A cross-repository reference should identify the source artifact and version, the affected requirement or property, and the reason for the relationship. Keep the original artifact in its owning repository; do not duplicate a threat register here.
 
-No URL for the separate repository is assumed in this baseline. Add a verified reference when linking a specific artifact.
+The companion [threat-modeling repository](https://github.com/secsar/threat-modeling) owns threat analysis. Use a commit-specific URL when relying on a particular model revision.
 
 ## Publication boundary
 

@@ -4,6 +4,7 @@ Primary sources inform the terminology and further study. The examples in this r
 
 | Publication | Use in this repository |
 | --- | --- |
+| [NIST IR 8539: Security Property Verification by Transition Model](https://csrc.nist.gov/pubs/ir/8539/final) | Transition models, temporal property specifications, and further model-checking study |
 | [NIST SP 800-162: Guide to Attribute Based Access Control](https://csrc.nist.gov/pubs/sp/800/162/upd2/final) | Attributes and policy-based authorization |
 | [NIST IR 6192: A Revised Model for Role-Based Access Control](https://csrc.nist.gov/pubs/ir/6192/final) | Role-model foundations and further study of hierarchy |
 | [NIST SP 800-192: Verification and Test Methods for Access Control Policies/Models](https://csrc.nist.gov/pubs/sp/800/192/final) | Policy/model verification and testing |
