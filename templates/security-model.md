@@ -1,63 +1,58 @@
-# Security model: [system name]
+# Security model: [name]
 
-**Status:** Draft  
-**Owner:** [role]  
-**Review date:** [date]  
-**Version:** [version]
+**Model ID / revision:**  
+**Owner / review date:**  
+**Formality:** prose / semi-formal / executable / formal  
+**Evidence status:** specified / reviewed / tested / proven with scope
 
-## Business purpose and scope
+## Protection requirements
 
-- Purpose:
-- Users:
-- Sensitive assets:
-- In scope:
-- Out of scope:
-- Assumptions requiring validation:
+| ID | Required security property | Stakeholder / rationale |
+| --- | --- | --- |
+| R-01 | | |
 
-## Architecture and trust boundaries
+## Scope and assumptions
 
-Add a diagram with labeled flows. Identify identity sources, authorization enforcement points, storage, external dependencies, and privileged paths.
+Define exclusions, trust dependencies, concurrency, identity, time, and storage assumptions.
 
-| Flow ID | Source → destination | Data | Trust boundary | Enforcement |
+## Model universe and state
+
+Define subjects, objects, actions, domains, labels, attributes, state variables, and initial states.
+
+## Policy rules
+
+Specify decision predicates, default decision, missing values, rule combination, administrative authority, and revocation semantics.
+
+## Transitions
+
+| Action | Actor | Preconditions | Effects | Unchanged fields |
 | --- | --- | --- | --- | --- |
-| F-01 | | | | |
+| | | | | |
 
-## Threat register
+## Properties
 
-| ID | Actor, precondition, action, and consequence | Likelihood | Impact | Priority | Proposed control | Owner role | Verification ID | State |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| T-01 | | | | | | | V-01 | Planned |
+| ID | Predicate or precise statement | Kind | Requirement |
+| --- | --- | --- | --- |
+| | | State / transition / trace / multi-execution | |
 
-Explain the basis of each rating. Record expected residual exposure without claiming verified reduction.
+## Assurance argument
 
-## Architecture decisions
+Describe initialization and preservation obligations, legitimate behavior, and policy sufficiency. Identify unresolved obligations.
 
-### D-01: [decision]
+## Implementation refinement
 
-- Related threats:
-- Selected approach:
-- Alternatives considered:
-- Reason:
-- Operational cost and tradeoffs:
-- Reconsider when:
+Map abstract states and actions to concrete components, transactions, interfaces, caches, and privileged operations.
 
-## Verification plan
+## Evidence
 
-### V-01: [control behavior]
-
-- Related threats:
-- Setup:
-- Action:
-- Expected result:
-- Evidence:
-- Execution status: Not run
-
-## Residual risk and review
-
-| Threat | Remaining exposure | Evidence gaps | Acceptance owner | Review trigger |
+| Property | Method | Version / bounds | Result | Limitations |
 | --- | --- | --- | --- | --- |
-| T-01 | | | Unassigned | |
+| | | | Not executed | |
 
-## Executive summary
+## Model limits and change triggers
 
-Explain the business risk, decisions needed, release conditions, and remaining uncertainty.
+State what the model does not establish and which changes invalidate its assumptions.
+
+## External references
+
+Reference source publications or separately owned artifacts by verified URL and version. Keep their detailed content in its owning repository.

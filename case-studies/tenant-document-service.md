@@ -1,133 +1,148 @@
-# Case study: Multi-tenant document service
+# Security model: Tenant document service
 
-**Type:** fictional architecture review  
-**Status:** proposed design; verification not executed  
-**Objective:** prevent one customer from accessing another customer's documents while supporting uploads and short-lived downloads.
+**Model:** SM-01, revision 2  
+**Status:** semi-formal specification with explanatory reasoning; not executable or machine-checked  
+**System:** fictional service; no customer or employer architecture
 
-## Executive summary
+## 1. Protection requirements
 
-The highest-priority design risk is cross-tenant document access. A valid login must never be enough to retrieve a document: the service must verify tenant membership and object ownership on every operation.
+| ID | Requirement |
+| --- | --- |
+| R-01 | Human content reads require current reader authorization for the document tenant |
+| R-02 | Only the exact approved version is readable |
+| R-03 | Content ownership cannot change through document operations |
+| R-04 | Membership administration does not itself grant content access |
+| R-05 | New read decisions observe committed membership revocations |
 
-The proposed design also quarantines uploads, limits download-link lifetime, separates support privileges, and applies tenant quotas. Before a real release, the team would need evidence that unauthorized access is denied, unscanned files cannot be downloaded, and privileged actions are attributable.
+This model focuses on authorization and content-state integrity. It does not claim complete confidentiality, malware detection, availability, or implementation security.
 
-## Scope and assumptions
+## 2. Universe and state
 
-- A tenant is a customer organization with multiple users.
-- Documents may contain confidential business information.
-- An external identity provider authenticates users; the service maintains tenant memberships and roles.
-- The browser, filenames, document IDs, and requested tenant IDs are untrusted.
-- Storage is private. The API issues short-lived download links only after authorization.
-- Endpoint compromise, identity-provider internals, billing, and disaster recovery design are outside this exercise.
-- The diagram shows logical components, not a deployed cloud configuration.
+- U: human users.
+- T: tenants.
+- W: trusted publication workers, distinct from U.
+- D: document IDs.
+- V: immutable content versions.
+- Roles: reader, editor, membership_admin.
+- Membership μ ⊆ U × T × Roles.
+- Documents δ map each existing document to (tenant, version, status).
+- Status ∈ {quarantined, approved, retired}.
+- Approval set α ⊆ D × V.
+- Content store κ maps versions to immutable bytes.
 
-## Architecture
+All IDs and authoritative attributes are server-controlled. Unknown users, documents, roles, or actions deny access. This finite-description specification does not bound the sizes of U, T, D, or V.
+
+## 3. Assumptions and trust
+
+A-01: user identity is authenticated correctly before policy evaluation.  
+A-02: workers are trusted to approve only content satisfying the publication procedure. Approval is a workflow assertion, not proof of harmless content.  
+A-03: each modeled transition is atomic; reads have a defined authorization point.  
+A-04: the content store cannot be accessed directly by users.  
+A-05: document tenant and version references cannot be changed outside defined transitions.  
+A-06: worker and membership-admin identities are provisioned by a trusted bootstrap process.
+
+The trusted computing base includes identity validation, policy evaluation, membership and document storage, publication workers, and the content delivery path.
+
+## 4. Policy
+
+For user u and document d in state σ:
+
+P-READ(u,d,σ) ⇔ d∈dom(δ) ∧ (u,δ[d].tenant,reader)∈μ ∧ δ[d].status=approved ∧ (d,δ[d].version)∈α.
+
+P-EDIT(u,d,σ) ⇔ d∈dom(δ) ∧ (u,δ[d].tenant,editor)∈μ ∧ δ[d].status≠retired.
+
+P-MANAGE(u,t,σ) ⇔ (u,t,membership_admin)∈μ.
+
+Roles are independent: editor and membership_admin do not imply reader. The policy uses role assignments plus tenant and lifecycle attributes. Every required condition must hold; otherwise deny.
+
+## 5. Transition specification
+
+Unmentioned state fields remain unchanged. Failed preconditions leave state unchanged and release no content.
+
+| Action | Preconditions | Effects |
+| --- | --- | --- |
+| Upload(u,t,d,v,bytes) | u has editor in t; d and v are fresh | κ[v]=bytes; δ[d]=(t,v,quarantined) |
+| Replace(u,d,v,bytes) | P-EDIT; v is fresh | Store bytes; replace version; status=quarantined; remove all approval entries for d; tenant unchanged |
+| Approve(w,d,v) | w∈W; d quarantined; v=current version; trusted publication procedure accepts v | Add (d,v) to α; status=approved |
+| Read(u,d) | P-READ | Return κ[current version]; no state mutation |
+| Retire(u,d) | P-EDIT | status=retired; remove approval entries for d |
+| Grant(u,t,x,r) | P-MANAGE; x∈U; r∈{reader,editor} | Add (x,t,r) to μ |
+| Revoke(u,t,x,r) | P-MANAGE; r∈{reader,editor} | Remove (x,t,r) from μ |
+
+Membership administrators may grant themselves a reader role in this policy. R-04 separates permissions, but does **not** establish separation of duties or prevent self-grants. A stronger requirement would need a different administrative policy.
+
+Membership-admin assignment and removal are excluded after bootstrap. Retired document IDs cannot be reused. Content versions are immutable, and replacement uses a fresh version.
+
+## 6. Initial state and properties
+
+Init: μ is a valid bootstrapped membership relation; δ, α, and κ are empty.
+
+| ID | Property | Kind |
+| --- | --- | --- |
+| I-01 | Every approved document has approval for its current version | State invariant |
+| I-02 | Every document version references existing immutable content | State invariant plus storage assumption |
+| I-03 | Each existing document retains its original tenant through every transition | Transition/history property |
+| I-04 | No retired document returns to approved or quarantined | Transition property |
+| P-01 | Every human content-release event satisfies P-READ at its authorization point | Event property |
+| P-02 | A committed reader revocation denies subsequent reads unless reader permission is granted again | Trace property |
+
+P-02 does not retract previously delivered bytes or cancel a read already authorized before revocation. This distinction is part of the model, not an implementation exception.
+
+## 7. State lifecycle
 
 ```mermaid
-flowchart TD
-    subgraph External["External boundary"]
-        U["User browser"]
-        I["Identity provider"]
-    end
-    subgraph Service["Application boundary"]
-        A["Document API"]
-        M["Membership and metadata"]
-        W["Scan worker"]
-    end
-    subgraph Data["Storage boundary"]
-        Q["Quarantine storage"]
-        S["Approved storage"]
-        L["Audit sink"]
-    end
-    U -->|"F1: authenticate"| I
-    U -->|"F2: token and document request"| A
-    A -->|"F3: membership and ownership lookup"| M
-    A -->|"F4: upload bytes"| Q
-    Q -->|"F5: scan input"| W
-    W -->|"F6: approved object"| S
-    A -->|"F7: authorized link signing"| S
-    U -->|"F8: short-lived signed download"| S
-    A -->|"F9: access decisions"| L
-    W -->|"F10: scan outcome"| L
+stateDiagram-v2
+    [*] --> Quarantined: Upload
+    Quarantined --> Quarantined: Replace
+    Quarantined --> Approved: Approve exact version
+    Approved --> Quarantined: Replace
+    Quarantined --> Retired: Retire
+    Approved --> Retired: Retire
+    Approved --> Approved: Authorized read
+    Retired --> [*]
 ```
 
-F1 returns a token to the browser. At F2 the API validates the token's signature, issuer, audience, and lifetime using trusted identity-provider configuration. F7 represents a logical signing operation; an implementation may sign locally using scoped credentials.
+The final marker indicates the end of the modeled document lifecycle, not deletion of stored bytes. Membership transitions operate independently of document state.
 
-| Boundary | Security requirement |
-| --- | --- |
-| Browser → API | Validate identity, active membership, role, and object ownership; reject client-selected tenant claims that lack server-side membership |
-| API → metadata | Scope reads and mutations to the authorized tenant; keep document ownership immutable through ordinary update operations |
-| API → quarantine | Enforce upload limits; do not expose quarantined objects through download routes |
-| Worker → approved storage | Publish only the exact object version that passed scanning; fail closed on scan failure |
-| Browser → approved storage | Signed links are bearer capabilities: restrict object, operation, and lifetime |
-| Service → audit sink | Record actor, tenant, object ID, decision, timestamp, and correlation ID; omit tokens, links, and document contents |
+## 8. Preservation argument
 
-## Threat register
+Init satisfies I-01 and I-02 vacuously. Upload creates existing content and a quarantined reference. Replace creates content before referencing it, clears approval, and retains the tenant. Approve requires the current version and records that same version. Retire removes readability without changing tenant or content. Read and membership actions do not change document state.
 
-Ratings describe the baseline before the proposed controls, using the [repository method](../docs/method.md). Owner roles are illustrative, not assigned people.
+Thus each listed transition preserves the state invariants under the atomicity and immutability assumptions. The transition definitions also preserve tenant ownership and prevent departure from retirement. P-01 follows from Read being the only modeled human release operation and its policy precondition. P-02 follows from evaluating membership in the committed state at each new read decision.
 
-| ID | Scenario | Likelihood / impact → priority | Proposed control | Owner role | Verify |
-| --- | --- | --- | --- | --- | --- |
-| T-01 | An authenticated tenant A user substitutes tenant B's document ID; an ownership check is missing, exposing confidential content | Medium / High → High | Central authorization on list, read, update, delete, and link issuance; tenant-scoped data access | Application engineering | V-01 |
-| T-02 | A recipient or log reader obtains a download URL and replays it while valid | Medium / Medium → Medium | Short-lived object-specific links, no URL logging, private storage; use an authenticated proxy if immediate revocation is required | Platform engineering | V-02 |
-| T-03 | An authenticated uploader submits malicious content that is published before scanning or replaces a previously scanned version | Medium / High → High | Isolated quarantine; scan exact immutable versions; fail closed; serve downloads as attachments | Application engineering | V-03 |
-| T-04 | A compromised support identity uses broad privileges to read customer documents without meaningful oversight | Medium / High → High | No standing content access; time-limited approved elevation; independent audit trail | Security operations | V-04 |
-| T-05 | A tenant submits oversized or excessive uploads and consumes shared storage or worker capacity | High / Medium → Medium | Per-tenant size, rate, storage, and concurrency limits; bounded queues and fair scheduling | Platform engineering | V-05 |
+This is a manual explanatory argument. It is not a machine-checked theorem or evidence that a real implementation has no other release path.
 
-T-01 requires an authenticated account and a missing ownership check. T-03 assumes an upload feature and unsafe publication behavior; malware detection is not assumed perfect. T-04 requires compromise of a privileged identity. T-05 is easy to attempt, but the assumed business impact is temporary service degradation rather than a sustained critical outage; revise that rating if availability requirements differ.
+## 9. Decision table
 
-**Control state for all rows: Planned.** No residual risk reduction has been measured.
+Each row assumes an existing object and all other required conditions unless stated otherwise.
 
-## Architecture decisions
-
-### D-01: Authorize at the API and scope data access by tenant
-
-Related threat: T-01.
-
-The API derives permitted tenant context from verified identity and server-side membership. Document access requires both that membership and ownership by the selected authorized tenant. Database queries include tenant scope.
-
-An alternative is to rely solely on opaque document IDs. Rejected: an identifier is not an authorization mechanism. Database-enforced isolation can add defense in depth, but requires an implementation-specific policy and tests.
-
-Tradeoff: membership lookups and policy consistency add complexity. Membership caches need an explicit revocation strategy. Revisit when shared documents or cross-tenant collaboration are introduced.
-
-### D-02: Use short-lived signed download links
-
-Related threat: T-02.
-
-Illustrative design target: links expire after 60 seconds and authorize a single object version for download. This reduces API bandwidth and permits direct storage delivery.
-
-An authenticated download proxy provides stronger per-request revocation but adds operational load. A signed link may remain usable until expiration after membership is revoked; expiration also may not terminate a download already in progress. Sensitive workflows requiring immediate revocation should select the proxy instead.
-
-Tradeoff: bearer-link leakage remains possible during validity. Revisit if immediate revocation or download-level user attribution becomes mandatory.
-
-### D-03: Separate quarantine from approved content
-
-Related threat: T-03.
-
-The scan worker reads quarantine and writes approved storage. The API can issue links only for approved object versions. Processing is idempotent; duplicate events cannot bypass approval.
-
-An alternative is to scan after publication. Rejected because it leaves a period in which unverified content is available.
-
-Tradeoff: uploads are not immediately downloadable, and scanner outages delay publication. Scanning cannot prove a file harmless. Retain safe content-disposition behavior and restrict active content handling.
-
-## Verification plan
-
-These are proposed procedures for an isolated implementation using synthetic records. **None has been run against a deployed service.**
-
-| ID | Setup and action | Expected outcome | Evidence to retain |
+| Subject/context | Document | Operation | Decision |
 | --- | --- | --- | --- |
-| V-01 | Create tenants A and B and one document each. As A, request B's document through list, read, update, delete, and link routes. Repeat after A's membership is revoked | No B content or link returned; no mutation; revoked membership denied within the documented revocation bound | Request/response records, unchanged object state, correlated authorization events |
-| V-02 | Issue a link; replay within validity, request after expiry, change object path, and attempt unsigned storage access. Inspect application logs | Replay within validity is possible and documented; new requests after expiry fail; modified and unsigned requests fail; no complete link or credential appears in logs | Timestamped responses and redacted log sample |
-| V-03 | Upload a benign fixture and an approved antivirus test fixture in an isolated lab; simulate scanner timeout and duplicate events; attempt a version replacement | Only the exact benign scanned version is published; timeout and rejected files remain unavailable; duplicates do not bypass approval | Object version IDs, scan states, download denials, audit events |
-| V-04 | Attempt content access as ordinary support; then exercise an approved temporary elevation and its expiry | Default access denied; elevation has approver, purpose, scope, and expiry; expired privilege denied | Approval record and independently retained audit events |
-| V-05 | Exceed configured size, rate, and concurrency limits for tenant A while tenant B submits normal requests | A is rejected or queued within documented bounds; B meets an agreed service target; queues and storage remain bounded | Load profile, tenant-specific latency, quota events, queue depth |
+| Tenant A reader | A, approved exact version | Read | Permit |
+| Tenant A reader only | B, approved exact version | Read | Deny |
+| Tenant A editor only | A, approved | Read | Deny |
+| Tenant A editor | A, approved | Replace | Permit; approval removed |
+| Tenant A reader | A, quarantined | Read | Deny |
+| Tenant A membership_admin only | A, approved | Read | Deny |
+| Tenant A membership_admin | Tenant B membership | Grant | Deny |
+| Revoked A reader, no regrant | A, approved | Read | Deny |
+| Trusted worker, stale version | A, quarantined | Approve | Deny |
+| Tenant A editor | A, retired | Replace | Deny |
 
-## Residual exposure and release conditions
+These are expected results, not executed tests.
 
-- Authorized users can still copy downloaded documents.
-- Valid signed links can be forwarded before expiry.
-- Malware scanning may miss novel or disguised content.
-- Compromise of a powerful service identity can exceed ordinary tenant permissions.
-- Audit retention and access controls need implementation-specific review.
-- Backup isolation and restoration require a separate model.
+## 10. Enforcement and evidence obligations
 
-A real release requires executed verification, resolved failures, an agreed availability target, documented membership-revocation behavior, and an accountable owner's decision on remaining risks. Risk acceptance is **unassigned** in this fictional exercise.
+| Property | Enforcement responsibility | Required evidence |
+| --- | --- | --- |
+| P-01, P-02 | Authenticated delivery path and authoritative membership lookup | Conformance tests, revocation/concurrency review, enumeration of all release paths |
+| I-01 | Version-bound publication transaction | State-transition tests, stale-approval rejection |
+| I-02 | Immutable storage and transactional metadata updates | Storage configuration and failed-write analysis |
+| I-03 | Ownership assigned only during creation | Schema/API review and transition tests |
+| I-04 | Lifecycle guard | Retired-state transition tests |
+
+The design uses authenticated content delivery rather than bearer download links. Adding links would introduce transferable capabilities and change the revocation and release properties; it requires an explicit model extension.
+
+## 11. Limits and extensions
+
+No machine execution, deployed-service test, liveness proof, noninterference proof, or compliance assessment is claimed. Future extensions can model delegated sharing, administrative separation of duties, audit durability, deletion, and recovery. Each extension must revisit the requirements, transition relation, and assurance argument.

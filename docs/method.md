@@ -1,46 +1,51 @@
 # Security modeling method
 
-This is the working method for this repository, not a certification or a claim of compliance with a particular framework.
+## 1. Define protection requirements
 
-## 1. Establish scope
+Describe the system purpose and properties stakeholders need: confidentiality, integrity, authorized use, accountability, or service continuity. Assign requirement IDs. Express requirements as observable conditions where possible.
 
-Name the business service, system owner, users, sensitive assets, assumptions, and exclusions. Define the failure that matters to the business before selecting controls.
+Example: R-01 — a human user may read only approved documents belonging to an organization in which that user currently holds a reader role.
 
-## 2. Model trust
+## 2. Define the model universe
 
-Draw components and labeled data flows. Mark where data crosses a change in ownership, identity, privilege, or execution environment. Identify the enforcement point for each boundary. Authentication alone does not establish permission to access an object.
+Specify subjects S, objects O, actions A, environment E, state space Σ, initial states Init, and transition relation T. State which values are authoritative, how unknown values are treated, and which operations are excluded.
 
-## 3. Describe threats
+A model need not use a theorem prover to be useful. Label prose and mathematical specifications accurately as semi-formal when syntax and semantics are not fully mechanized.
 
-Use this form:
+## 3. Specify policy
 
-> An actor with [capability] can [action] through [entry point] because [weakness or assumption], causing [business consequence].
+Define Permit(s, a, o, e, σ). Identify deny defaults, rule-combination behavior, administrative authority, and revocation semantics. Describe policy updates as carefully as content operations.
 
-Consider identity abuse, data modification, unauthorized disclosure, loss of accountability, service disruption, and privilege escalation. Record preconditions and distinguish plausible scenarios from verified vulnerabilities.
+Separate authentication assumptions from authorization decisions. A successful login identifies a subject; the policy determines allowed operations.
 
-## 4. Prioritize transparently
+## 4. State security properties
 
-Use qualitative judgments, not invented numerical precision.
+An invariant I is intended to hold in every reachable state. A transition property constrains a step from σ to σ′. A trace property constrains a sequence of steps; some information-flow properties compare multiple executions.
 
-| Dimension | Low | Medium | High |
-| --- | --- | --- | --- |
-| Likelihood | Requires unusual access or several difficult preconditions | Feasible for an authenticated user or under a plausible failure | Accessible and repeatable with few preconditions |
-| Impact | Limited, reversible disruption with little sensitive exposure | Material impact to one tenant or business process | Broad sensitive exposure, privileged compromise, or sustained critical outage |
+Do not turn every goal into an invariant by name alone. Eventual completion is a liveness property and requires progress assumptions.
 
-For this repository: High impact with Medium or High likelihood is High priority; Low impact with Low likelihood is Low priority; other combinations are Medium. Review context before adopting this convention elsewhere.
+## 5. Model transitions
 
-Rate the **baseline scenario before the proposed controls**. Describe expected residual exposure separately. Do not lower an assessed rating solely because a control is planned.
+For each action specify actor, precondition, changed fields, unchanged fields, and result. Explicit frame conditions prevent an apparently narrow operation from silently modifying security labels or ownership.
 
-## 5. Make decisions
+Specify atomicity and concurrency assumptions. If authorization and data access can observe different states, model that interval or identify it as an unresolved refinement obligation.
 
-Record the selected control, rejected alternatives, operational cost, owner role, and conditions that would trigger reconsideration. A useful decision explains why the control fits the system.
+## 6. Allocate enforcement
 
-## 6. Define evidence
+Map each rule to the component that enforces it and the authoritative data it uses. Identify the trusted computing base: components whose incorrect behavior can invalidate the model.
 
-Give each threat a verification ID. Specify the setup, action, expected outcome, and evidence to retain. Include negative tests, such as requesting an object owned by another tenant.
+Record bypass paths, administrative operations, caches, background workers, and exported capabilities. The model's scope must match its assurance claim.
 
-Use explicit states: Planned, Implemented, Verified, or Accepted. Acceptance requires a named accountable owner and review date in a real implementation.
+## 7. Establish assurance obligations
 
-## 7. Revisit
+For an invariant, show:
+- Initialization: every permitted initial state satisfies I.
+- Preservation: every permitted transition from an I-state produces another I-state.
 
-Review when identities, data sensitivity, integrations, deployment boundaries, or business requirements change. Also revisit after incidents and failed verification.
+Then determine how the implementation corresponds to the modeled states and actions. Use [assurance guidance](assurance.md) to distinguish planned evidence from completed work.
+
+## 8. Review sufficiency and change
+
+Verification asks whether the model satisfies specified properties; validation asks whether those properties represent the intended protection needs. Revisit both when requirements, policy administration, concurrency, trust dependencies, or external interfaces change.
+
+Use the [template](../templates/security-model.md) to record the complete specification.
